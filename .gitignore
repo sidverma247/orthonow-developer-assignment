@@ -1,0 +1,24 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Node (only if tooling is added later — no runtime deps today)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Build / temp output
+dist/
+build/
+*.log
+.cache/
+
+# Lighthouse / test reports (keep curated screenshots in assets/ instead)
+lighthouse-report.*
+.lighthouseci/
