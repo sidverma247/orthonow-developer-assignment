@@ -1,0 +1,43 @@
+name: Lint & validate
+
+# Runs on every push and PR against main. Keeps the single HTML deliverable
+# valid and free of obvious markup errors — cheap insurance for a static site.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  html-validate:
+    name: Validate index.html
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # html-validate is a fast, dependency-light HTML5 linter. --formatter
+      # stylish gives readable output in the Actions log.
+      - name: Run html-validate
+        run: |
+          npx --yes html-validate \
+            task-02-landing-page/index.html \
+            --formatter stylish
+
+  markdown-lint:
+    name: Lint documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Non-blocking style pass over the docs so the Markdown stays consistent.
+      # `|| true` keeps a stylistic nit from failing the build.
+      - name: Run markdownlint
+        run: |
+          npx --yes markdownlint-cli "**/*.md" --ignore node_modules || true
