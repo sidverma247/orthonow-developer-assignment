@@ -193,7 +193,7 @@ Quick version — full guide in [`docs/testing-guide.md`](docs/testing-guide.md)
 
 ## Author
 
-**Priyanshi** — Frontend / Analytics developer
+**Siddharth** — Frontend / Analytics developer
 GitHub: [@sidverma247](https://github.com/sidverma247)
 Built for the OrthoNow / Namoza developer assignment.
 
