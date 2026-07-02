@@ -10,6 +10,15 @@ The measurement plan for the OrthoNow consultation campaign. Read the three docu
 3. **[Google_Ads_Conversion.md](Google_Ads_Conversion.md)** — why only `booking_confirmed` is
    imported to Google Ads and why call / WhatsApp / PDF / clinic-view / scroll are deliberately not.
 
+## Ready-to-import container
+
+The schema isn't just documented — it's **built**. Two files turn it into a live GTM setup:
+
+- **[GTM_Container_OrthoNow.json](GTM_Container_OrthoNow.json)** — a real GTM container export
+  (14 tags, 11 triggers, 22 variables) you import via **GTM → Admin → Import Container**.
+- **[GTM_Import_Guide.md](GTM_Import_Guide.md)** — step-by-step import instructions, the 3 IDs to
+  replace after import, and how to verify each tag fires.
+
 ## The one thing to take away
 
 The schema is built on one design decision: **the developer owns a small, structured `dataLayer`;
