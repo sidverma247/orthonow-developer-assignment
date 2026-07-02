@@ -53,11 +53,8 @@ orthonow-developer-assignment/
 │   └── testing-guide.md              ← how to test the page, validation, GTM & Lighthouse
 │
 ├── task-01-gtm-schema/               ← TASK 1: measurement plan
-│   ├── README.md                     ← how to read this task
-│   ├── GTM_Event_Schema.md           ← full event table (13 events)
-│   ├── Booking_Funnel.md             ← 3-step funnel, real dataLayer JSON, GA4 exploration
-│   ├── Google_Ads_Conversion.md      ← which event to import as a conversion, and why
-│   └── assets/                       ← funnel / event-flow diagrams (place PNGs here)
+│   └── GTM_Event_Schema.md           ← full event table (13 events) + 3-step funnel
+│                                        drop-off (real JSON) + Google Ads conversion
 │
 ├── task-02-landing-page/             ← TASK 2: the page
 │   ├── index.html                    ← ONE self-contained file (HTML+CSS+JS)

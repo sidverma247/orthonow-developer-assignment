@@ -67,7 +67,7 @@ console.log(window.dataLayer);
 ```
 
 Fires **only after validation passes** — never on page load. This is the single-screen analogue of
-the multi-step `booking_confirmed` event documented in [Task 1](../task-01-gtm-schema/Booking_Funnel.md).
+the multi-step `booking_confirmed` event documented in [Task 1](../task-01-gtm-schema/GTM_Event_Schema.md#2-booking-funnel-drop-off-3-step-form).
 
 ## Validation rules
 

@@ -28,11 +28,11 @@ don't tell. Have the repo open in an editor and `index.html` open in a browser w
 > tags. Notice there's no `booking_step_1` and `booking_step_2` — it's one `booking_step_complete`
 > event with a `step_number` parameter. That keeps the event list short and lets GA4's Funnel
 > Exploration do the sequencing."
-- Open `Booking_Funnel.md`, show the JSON and the drop-off table.
+- Scroll to `GTM_Event_Schema.md` → **Part 2: Booking funnel drop-off**, show the JSON and the drop-off table.
 > "Here's the real dataLayer JSON for each step, and a worked funnel. The biggest leak is step 2 to
-> step 3 — slot selection — which tells marketing to add evening and weekend slots, not to spend more
-> on ads. Every number here is a fixable, re-measurable decision."
-- Open `Google_Ads_Conversion.md`.
+> step 3 — contact details and date — which tells marketing to fix the mobile form or add convenient
+> dates, not to spend more on ads. Every number here is a fixable, re-measurable decision."
+- Scroll to **Part 3: Google Ads conversion**.
 > "And I only import one conversion into Google Ads — `booking_confirmed` — because it's the actual
 > outcome and it carries value. Call clicks, WhatsApp clicks, PDF downloads and scroll are intent
 > signals; importing them would teach Google to chase cheap taps instead of bookings."
