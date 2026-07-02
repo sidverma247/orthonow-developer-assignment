@@ -94,4 +94,5 @@ This report helps identify where users leave the booking process so improvements
 
 # 3. Google Ads Conversion Recommendation
 
-I would import **`booking_confirmed`** as the Google Ads conversion because it represents a successfully completed consultation booking, which is OrthoNow's primary business goal. Events such as **Call Now**, **WhatsApp Click**, **Patient Guide Download**, or **Blog Scroll** indicate user interest but do not confirm a booking. Optimizing campaigns for **`booking_confirmed`** gives Google Ads a stronger conversion signal and improves Smart Bidding performance.
+I would import **`booking_confirmed`** as the Google Ads conversion because it represents a successfully completed consultation booking, which is OrthoNow's primary business goal. Events such as **Call Now**, **WhatsApp Click**, **Patient Guide Download**, or **Blog Scroll** indicate user interest but do not confirm a booking imoprting them can cause could causeGoogle Ads to optimize toward users who never complete a booking, reducing overall campaign efficiency.. Optimizing campaigns for **`booking_confirmed`** gives Google Ads a stronger conversion signal and improves Smart Bidding performance.
+
