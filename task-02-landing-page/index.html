@@ -722,7 +722,7 @@
           var open = details.classList.toggle("show");
           viewBtn.textContent = open ? "Hide details" : "View clinic";
           if (open) {
-            track("clinic_location_view", { clinic_location: c.name, city: c.city });
+            track("clinic_location_view", { clinic_location: c.name, city: c.city, page_location: location.href });
           }
         });
 
@@ -753,7 +753,8 @@
       if (call) {
         track("call_now_click", {
           link_url: call.getAttribute("href"),
-          link_location: call.getAttribute("data-loc") || "unknown"
+          link_location: call.getAttribute("data-loc") || "unknown",
+          page_location: location.href
         });
         return; // let the tel: link proceed
       }
@@ -761,7 +762,8 @@
       if (wa) {
         track("whatsapp_click", {
           link_url: wa.getAttribute("href"),
-          link_location: "floating_widget"
+          link_location: "floating_widget",
+          page_location: location.href
         });
       }
     });
@@ -812,7 +814,11 @@
     function openBooking(entryPoint) {
       if (!bookingOpened) {
         bookingOpened = true;
-        track("booking_started", { entry_point: entryPoint || "unknown", device_type: window.innerWidth < 768 ? "mobile" : "desktop" });
+        track("booking_started", {
+          entry_point: entryPoint || "unknown",
+          device_type: window.innerWidth < 768 ? "mobile" : "desktop",
+          page_location: location.href
+        });
       }
       document.getElementById("book").scrollIntoView({ behavior: "smooth", block: "start" });
       B.clinic.focus({ preventScroll: true });
