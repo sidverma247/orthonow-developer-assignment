@@ -47,6 +47,7 @@ The booking form is a custom 3-step form, so the **frontend developer** should p
   "event": "booking_step_complete",
   "step_number": 2,
   "step_name": "patient_details_entered",
+  "phone_provided": "True",
   "clinic_location": "Indiranagar",
   "specialty": "Orthopaedics",
   "preferred_date": "2026-07-20"
