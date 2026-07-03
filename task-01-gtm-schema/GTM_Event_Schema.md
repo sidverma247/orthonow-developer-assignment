@@ -1,79 +1,121 @@
 # Task 01 — GTM Event Schema
 
-**OrthoNow consultation campaign — measurement plan.**
-This document is the complete Task 1 deliverable in three parts:
+A plain-English guide to how OrthoNow measures its website — written so you can read it top to
+bottom and then explain it to someone who has never touched analytics.
 
-1. **[The complete GTM event schema](#1-complete-gtm-event-schema)** — every event I would implement, as a structured table (Event Name · Trigger Type · Key Parameters · GA4 report/audience).
-2. **[Booking funnel drop-off tracking](#2-booking-funnel-drop-off-3-step-form)** — for the 3-step form: the GTM trigger at each step, the **actual JSON** `dataLayer` push, and how the step-level drop-off is surfaced in GA4 Funnel Exploration.
-3. **[The one Google Ads conversion to import](#3-google-ads-conversion-to-import)** — and why that one over the others.
-
-All 13 events are implemented and observable in the [Task 2 landing page](../task-02-landing-page/index.html) — open the browser console and interact.
+**The whole point in one sentence:** the campaign spends money to get people onto the site, and this
+schema lets us *see* which of those people book a consultation — and where the rest drop off — so we
+stop guessing and start fixing.
 
 ---
 
-## 1. Complete GTM event schema
+## Explain-it-in-30-seconds
 
-| # | Event Name | Trigger Type | Key Parameters (min. 3) | GA4 Report / Audience it feeds |
-|---|------------|--------------|-------------------------|--------------------------------|
-| 1 | `booking_started` | Custom Event (dataLayer) — booking widget opens | `entry_point`, `device_type`, `page_location` | **Report:** Funnel Exploration (entry step / denominator). **Audience:** *"Started booking — not confirmed"* → remarketing. |
-| 2 | `booking_step_complete` | Custom Event (dataLayer) — each step's valid "Continue" | `step_number`, `step_name`, `clinic_location`, `specialty` | **Report:** Funnel Exploration (middle steps, drop-off). **Audience:** *"Reached step 2 / step 3"*. |
-| 3 | `booking_confirmed` | Custom Event (dataLayer) — booking persisted (server returns `booking_id`) | `booking_id`, `clinic_location`, `specialty`, `value`, `currency` | **Report:** Conversions / Key Events + Funnel final step. **Audience:** *"Converters"* (exclude from prospecting). **→ imported Google Ads conversion.** |
-| 4 | `booking_error` | Custom Event (dataLayer) — error/catch branch of booking flow | `error_type`, `error_message`, `step_number`, `clinic_location` | **Report:** Custom exploration + DebugView (diagnostic; alert on spikes). No audience. |
-| 5 | `call_now_click` | Click — auto-event on `a[href^="tel:"]` | `link_url`, `link_location`, `page_location` | **Report:** Engagement → Events. **Audience:** *"High-intent callers"* → call-focused remarketing. |
-| 6 | `whatsapp_click` | Click — auto-event on `a[href*="wa.me"]` | `link_url`, `link_location`, `page_location` | **Report:** Engagement → Events. **Audience:** *"WhatsApp responders"*. |
-| 7 | `patient_guide_submit` | Custom Event (dataLayer) — guide gate form submit | `guide_name`, `pain_area`, `city` | **Report:** Events / Lead report. **Audience:** *"Guide leads — nurture"* (content remarketing). |
-| 8 | `patient_guide_download` | Click / File download — link click on the `.pdf` | `file_name`, `guide_name`, `pain_area` | **Report:** Engagement → File downloads (confirms delivery vs. submit). |
-| 9 | `clinic_location_view` | Element Visibility (≥50% of `.clinic-card`) or Custom Event | `clinic_location`, `city`, `page_location` | **Report:** Engagement by location (local budget). **Audience:** *"Interested in <city>"* → geo remarketing. |
-| 10 | `blog_scroll_25` | Scroll Depth — auto-event, 25% (blog pages only) | `percent_scrolled`, `article_title`, `pain_area`, `page_path` | **Report:** Content engagement — separates bounces from readers. |
-| 11 | `blog_scroll_50` | Scroll Depth — auto-event, 50% | `percent_scrolled`, `article_title`, `pain_area`, `page_path` | **Report:** Content engagement. **Audience:** *"Engaged readers"* → booking-CTA remarketing. |
-| 12 | `blog_scroll_75` | Scroll Depth — auto-event, 75% | `percent_scrolled`, `article_title`, `pain_area`, `page_path` | **Report:** Content engagement. **Audience:** *"Deep readers"*. |
-| 13 | `blog_scroll_90` | Scroll Depth — auto-event, 90% | `percent_scrolled`, `article_title`, `pain_area`, `page_path` | **Report:** Content engagement. **Audience:** *"Finished the article"* (highest-intent content audience). |
-
-**Feature → events map:** Appointment booking (3 steps) = events 1–4 · Call Now buttons = 5 · WhatsApp widget = 6 · Patient Guide download = 7–8 · Clinic location views = 9 · Blog article reads = 10–13.
-
-### Trigger types, and why each is used
-
-- **Custom Event (dataLayer)** — events 1–4, 7. Fire on an explicit `dataLayer.push({ event: "..." })` from the developer. Used for anything GTM **cannot infer from the DOM**: a *completed* step, a *persisted* booking, a *validated* submit, an error branch. Only the app code knows a booking actually saved, so it announces it.
-- **Click (auto-event)** — events 5, 6, 8. GTM's Click listener fires on elements matching a CSS selector / URL pattern (`tel:`, `wa.me`, `.pdf`). No developer code; marketing adds tracked links without a deploy.
-- **Scroll Depth (auto-event)** — events 10–13. One listener, four thresholds, scoped to blog templates by a page-path condition; differentiated by `percent_scrolled`.
-- **Element Visibility** — event 9. Fires when a clinic card crosses a visibility threshold — "was this clinic seen?" — with no developer push.
-
-### Conventions
-
-`snake_case`, verb-led event names (GA4 recommended style). Events describe *what happened*; parameters describe *context* (so it's **one** `booking_step_complete` event with a `step_number` parameter, not `booking_step_1`/`booking_step_2`). Every custom parameter is registered as a GA4 **event-scoped custom dimension** so it's queryable in Explorations. **No PII in GA4** — `user_name`/`phone_number` go to the CRM, never into GA4 parameters.
+> "Every time a visitor does something that matters — opens the booking form, taps *Call*, downloads
+> a guide, finishes an article — the page quietly writes a note about it. Google Tag Manager reads
+> those notes and passes them to Google Analytics, which turns them into reports and audiences. The
+> single most important note is *'a booking was confirmed'* — that's the one we send to Google Ads so
+> its bidding chases real bookings, not cheap clicks."
 
 ---
 
-## 2. Booking funnel drop-off (3-step form)
+## How the tracking works (the mental model)
 
-The booking widget is a single-page interaction: no page loads between steps and no native per-step `submit` event. GTM can see a *click* on "Continue," but not whether it was *valid*, which *step* it completed, or what was *selected* — that state lives in JavaScript. So **the developer announces each step completion with a structured `dataLayer.push()`**; GTM listens, GA4 records, and Funnel Exploration sequences. That is exactly how step-level drop-off becomes measurable.
-
-The three steps and confirmation:
+Four moving parts, in order. If you understand this chain, you understand the whole schema:
 
 ```
-Open widget          →  booking_started
-Step 1: clinic+specialty →  booking_step_complete (step_number = 1)
-Step 2: name+phone+date  →  booking_step_complete (step_number = 2)
-Step 3: review & confirm →  booking_step_complete (step_number = 3)
-Booking saved            →  booking_confirmed
+  1. The visitor          2. The dataLayer        3. GTM              4. GA4 / Google Ads
+  does something    →     (the page's notepad) →  (the dispatcher) →  (the reports + the ad robot)
 ```
 
-### What fires at each step (GTM trigger + actual JSON)
+| Part | Plain-English job | The one-line analogy |
+|------|-------------------|----------------------|
+| **The visitor action** | Clicks, submits, scrolls, books. | Someone doing something in a shop. |
+| **The `dataLayer`** | A little notepad on the page where the developer writes a structured note: *"event: booking_confirmed, clinic: Indiranagar…"* | A sticky note the shop assistant jots down. |
+| **GTM (Google Tag Manager)** | Watches the notepad. When a note it recognises appears, it forwards it to the right place. We configure this without touching code. | The dispatcher who reads the notes and radios them in. |
+| **GA4 & Google Ads** | GA4 stores every note and builds reports/audiences. Google Ads takes *one* note — the confirmed booking — and learns from it. | Head office: keeps the records, and trains the ad-buying robot. |
 
-**On widget open — `booking_started`.**
-GTM trigger: **Custom Event**, condition `Event equals booking_started`. Fires the GA4 tag *"GA4 – booking_started"*. This is the funnel's denominator.
+**The key idea to land with anyone:** GTM can *see* clicks and scrolls on its own, but it **cannot
+see inside a JavaScript booking form** — it doesn't know a step was completed or a booking was saved.
+So for those moments, the developer has to write the note explicitly (`dataLayer.push`). Everything
+else, GTM can pick up by itself.
 
-```json
-{
-  "event": "booking_started",
-  "entry_point": "hero_cta",
-  "device_type": "mobile",
-  "page_location": "https://www.orthonow.example/book"
-}
-```
+---
 
-**Step 1 complete (location + specialty selected).**
-GTM trigger: **Custom Event**, condition `Event equals booking_step_complete`. The step is identified by the `step_number` parameter — the same trigger handles all three steps.
+## The events, grouped by what they're *for*
+
+Ten events, in three buckets. This grouping is the easiest way to explain the schema — lead with the
+bucket, not the event name.
+
+### 🟢 MONEY — the booking funnel (the events we actually get paid on)
+
+These trace a person from *"started booking"* to *"booked."* This is where optimisation effort goes.
+
+- **`booking_started`** — someone opened the booking form. *Tells us:* how many people even begin. Without it we'd have no denominator.
+- **`booking_step_complete`** — they finished a step (1, 2 or 3). *Tells us:* exactly which step people give up on.
+- **`booking_confirmed`** — the booking was saved. **This is the goal.** *Tells us:* a real appointment exists — and it's the one signal we send to Google Ads.
+- **`booking_error`** — something broke mid-booking. *Tells us:* whether a drop-off is the user hesitating or our system failing.
+
+### 🔵 CONTACT — they reached out another way
+
+Not everyone uses the form. Older or in-a-hurry visitors call or WhatsApp instead.
+
+- **`call_now_click`** — tapped a phone number. *Tells us:* how much demand goes down the phone line.
+- **`whatsapp_click`** — opened the WhatsApp chat. *Tells us:* appetite for a low-pressure channel.
+
+*(Important nuance to explain: a tap is **interest**, not a booking — we count it, but we don't treat
+it as a conversion. More on that in the Google Ads section.)*
+
+### 🟡 INTEREST — warming up, not ready yet
+
+People researching their knee/back pain. Great remarketing fuel; not conversions.
+
+- **`patient_guide_submit`** — gave their details to download a guide. *Tells us:* a nurture lead.
+- **`patient_guide_download`** — the PDF actually downloaded. *Tells us:* the content was delivered (submit ≠ download).
+- **`clinic_location_view`** — looked at a specific clinic. *Tells us:* which city/area is drawing interest → where to put local budget.
+- **`blog_scroll`** — read 25 / 50 / 75 / 90% of an article. *Tells us:* who's genuinely engaged vs. who bounced.
+
+---
+
+## The full schema table (the deliverable)
+
+Every event, its GTM trigger, at least three parameters, and the GA4 report or audience it feeds —
+plus a plain-English column so anyone can follow it.
+
+| Event Name | Trigger Type | Key Parameters (min. 3) | Feeds (GA4 report / audience) | In plain English |
+|------------|--------------|-------------------------|-------------------------------|------------------|
+| `booking_started` | Custom Event (page writes the note when the form opens) | `entry_point`, `device_type`, `page_location` | Funnel Exploration (start) · Audience *"Started, didn't finish"* | "Someone opened the booking form." |
+| `booking_step_complete` | Custom Event (one per completed step) | `step_number`, `step_name`, `clinic_location`, `specialty` | Funnel Exploration (middle steps) · Audience *"Reached step 2/3"* | "They finished a step of the form." |
+| `booking_confirmed` | Custom Event (fired when the server saves the booking) | `booking_id`, `clinic_location`, `specialty`, `value`, `currency` | Key Events / Conversions · Audience *"Booked"* · **→ Google Ads** | "A real appointment now exists." |
+| `booking_error` | Custom Event (fired in the error branch) | `error_type`, `error_message`, `step_number`, `clinic_location` | Debug dashboard (alert on spikes) | "The booking broke — here's why." |
+| `call_now_click` | Click — GTM sees a tap on a `tel:` link | `link_url`, `link_location`, `page_location` | Engagement → Events · Audience *"High-intent callers"* | "They tapped a phone number." |
+| `whatsapp_click` | Click — GTM sees a tap on the `wa.me` link | `link_url`, `link_location`, `page_location` | Engagement → Events · Audience *"WhatsApp responders"* | "They opened WhatsApp chat." |
+| `patient_guide_submit` | Custom Event (or Form Submit) on the gate form | `guide_name`, `pain_area`, `phone_provided` | Lead report · Audience *"Guide leads — nurture"* | "They gave details for a free guide." |
+| `patient_guide_download` | Click / File-download on the `.pdf` | `file_name`, `guide_name`, `pain_area` | Engagement → File downloads | "The guide actually downloaded." |
+| `clinic_location_view` | Element Visibility (demo) / Page View on `/clinics/*` (live site) | `clinic_location`, `city`, `page_location` | Engagement by location · Audience *"Interested in <city>"* | "They looked at a specific clinic." |
+| `blog_scroll` | Scroll Depth — fires at 25 / 50 / 75 / 90% | `percent_scrolled`, `article_title`, `pain_area`, `page_path` | Content engagement · Audience *"Engaged readers"* | "They read this much of an article." |
+
+> **Parameters, in plain terms:** the *event* is the headline ("a booking was confirmed"); the
+> *parameters* are the details that make it useful ("…at Indiranagar, for a knee, worth ₹800"). Every
+> parameter here is registered in GA4 as a **custom dimension** so it can be filtered and grouped in
+> reports.
+
+---
+
+## The booking funnel, and how we see where people quit
+
+### Why the page has to "announce" each step
+
+A booking form built in JavaScript changes on screen without loading a new page. GTM watches for page
+loads and clicks — so between "step 1" and "step 2" it sees **nothing**. It has no idea a step was
+completed or what the person chose. So we make the page **say it out loud**: at the end of each step
+the developer runs one `dataLayer.push()` with a note. GTM hears the note; GA4 records it; the funnel
+report lines them up in order. That's the entire trick.
+
+### What the page says at each step (the real notes)
+
+**Step 1 — picked a clinic and what's wrong.** GTM listens with a Custom Event trigger on
+`booking_step_complete`; the `step_number` tells the steps apart.
 
 ```json
 {
@@ -85,8 +127,7 @@ GTM trigger: **Custom Event**, condition `Event equals booking_step_complete`. T
 }
 ```
 
-**Step 2 complete (contact details + preferred date entered).**
-GTM trigger: the **same** `Event equals booking_step_complete` Custom Event trigger.
+**Step 2 — entered contact details and a preferred date.** *Same* trigger — we don't need a new one.
 
 ```json
 {
@@ -95,12 +136,12 @@ GTM trigger: the **same** `Event equals booking_step_complete` Custom Event trig
   "step_name": "contact_and_date_entered",
   "clinic_location": "{{clinic name}}",
   "specialty": "{{specialty selected}}",
-  "appointment_date": "{{YYYY-MM-DD}}"
+  "appointment_date": "{{YYYY-MM-DD}}",
+  "phone_provided": true
 }
 ```
 
-**Step 3 complete (booking reviewed).**
-GTM trigger: the **same** `Event equals booking_step_complete` Custom Event trigger.
+**Step 3 — reviewed the booking.** Still the same trigger.
 
 ```json
 {
@@ -113,8 +154,8 @@ GTM trigger: the **same** `Event equals booking_step_complete` Custom Event trig
 }
 ```
 
-**Confirmation — `booking_confirmed` (the conversion).**
-GTM trigger: **Custom Event**, condition `Event equals booking_confirmed`. Fired from the **success callback** of the booking API — using the server `booking_id` proves the record persisted and gives a dedup / order id.
+**Confirmation — the booking is saved.** A *separate* note, fired from the server's success response,
+carrying the real `booking_id` (which proves it saved and stops double-counting).
 
 ```json
 {
@@ -128,54 +169,85 @@ GTM trigger: **Custom Event**, condition `Event equals booking_confirmed`. Fired
 }
 ```
 
-> **Why one event with a `step_number` parameter (not three separate events)?** It keeps the schema small and lets GA4's Funnel Exploration define each step as a condition on that parameter — so adding or reordering steps never means creating new events or GTM triggers.
+> **Why one `booking_step_complete` event with a `step_number`, instead of three different events?**
+> Fewer things to explain, fewer triggers to maintain, and GA4 can still separate the steps using the
+> number. It's the same reason we don't name files `photo1`, `photo2`, `photo3`.
 
-### Surfacing step-level drop-off in GA4 Funnel Exploration
+### Seeing the drop-off in GA4 (Funnel Exploration)
 
-In **GA4 → Explore → Funnel exploration**, build a **closed** funnel (each step must happen in order) with these five steps:
+In **GA4 → Explore → Funnel exploration**, build a **closed** funnel (people must go in order):
 
-| Funnel step | Condition |
-|-------------|-----------|
-| 1. Booking started | event = `booking_started` |
-| 2. Step 1 complete | event = `booking_step_complete` **AND** `step_number` = 1 |
-| 3. Step 2 complete | event = `booking_step_complete` **AND** `step_number` = 2 |
-| 4. Step 3 complete | event = `booking_step_complete` **AND** `step_number` = 3 |
-| 5. Booking confirmed | event = `booking_confirmed` |
+| Funnel step | GA4 condition |
+|-------------|---------------|
+| 1. Started | event = `booking_started` |
+| 2. Step 1 done | `booking_step_complete` AND `step_number` = 1 |
+| 3. Step 2 done | `booking_step_complete` AND `step_number` = 2 |
+| 4. Step 3 done | `booking_step_complete` AND `step_number` = 3 |
+| 5. Confirmed | event = `booking_confirmed` |
 
-Add a **breakdown** by `clinic_location`, a **segment** by `device_type`, and enable *"Show elapsed time"* to spot steps where users stall. GA4 renders the completion and abandonment rate between every step.
+Add a **breakdown by `clinic_location`** and a **segment by `device_type`**, and GA4 draws the
+drop-off between every step.
 
-**Worked example — where the funnel leaks:**
+**Read it like a story:**
 
-| Step | Event | Users | Step conversion | Drop-off | % of started |
-|------|-------|------:|----------------:|---------:|-------------:|
-| 1 | `booking_started` | 4,000 | — | — | 100% |
-| 2 | Step 1 complete | 3,120 | 78.0% | 22.0% (880) | 78.0% |
-| 3 | Step 2 complete | 1,950 | 62.5% | **37.5% (1,170)** | 48.8% |
-| 4 | Step 3 complete | 1,560 | 80.0% | 20.0% (390) | 39.0% |
-| 5 | `booking_confirmed` | 1,310 | 84.0% | 16.0% (250) | **32.8%** |
+| Step | People here | Made it to next step | Lost here |
+|------|------------:|---------------------:|----------:|
+| Started | 4,000 | 78% | — |
+| Step 1 done | 3,120 | 63% | 22% |
+| Step 2 done | 1,950 | 80% | **37% ← biggest leak** |
+| Step 3 done | 1,560 | 84% | 20% |
+| **Confirmed** | **1,310** | — | 16% |
 
-**How marketing acts on it:** the biggest single leak is **step 2 → step 3 (37.5%)** — the contact-details/date step. Broken down by `device_type` it's usually worse on mobile, pointing at a UX/keyboard problem or too few convenient dates rather than "spend more on ads." The final `booking_confirmed` drop (16%) is cross-referenced with `booking_error` to tell hesitation apart from a technical failure. The `clinic_location` breakdown shows which clinic under-converts so slot capacity and budget can be reallocated. Every fix is re-measurable in the same report.
+The story this tells: *"We lose the most people at the contact-details step — and on mobile it's
+worse. That's not a reason to buy more ads; it's a reason to fix that form."* Cross-check the final
+16% against `booking_error` and you know whether it's hesitation or a bug. That's the whole value of
+the schema in one sentence: **it turns 'bookings are expensive' into a specific, fixable to-do.**
 
 ---
 
-## 3. Google Ads conversion to import
+## The one conversion we send to Google Ads
 
-**Import exactly one conversion: `booking_confirmed`** — via the **GA4 → Google Ads conversion import** (not a hard-coded Ads tag).
+**We import exactly one: `booking_confirmed`.**
 
-**Why `booking_confirmed` and not the others:**
+The plain-English reason: Google Ads' bidding is a robot that learns from whatever you feed it. Feed
+it *real bookings* and it goes and finds more people like the ones who book. Feed it *cheap actions*
+and it goes and finds more of those — and you get a dashboard full of "conversions" and an empty
+appointment book.
 
-- **It is the business outcome.** The campaign goal is *consultation bookings*; `booking_confirmed` fires only when a booking is persisted (has a `booking_id`). It's the closest measurable event to revenue.
-- **It carries value.** `value` + `currency` enable **value-based bidding (tROAS)**, so Google can favour higher-value clinics/specialties.
-- **It's deduplicated.** `booking_id` acts as the order id, so refreshes/retries don't inflate the count.
-- **It's high-fidelity, low-volume.** Smart Bidding learns fastest from a signal that reliably correlates with money.
+| If we imported… | The robot would learn to find… | Why that's bad |
+|-----------------|-------------------------------|----------------|
+| `call_now_click` / `whatsapp_click` | people who **tap** a button | A tap isn't a booking — we don't know it connected. |
+| `patient_guide_download` | people who grab a **free PDF** | Cheap and easy — it would flood us with non-buyers. |
+| `clinic_location_view` | people who **scroll past** a clinic | Almost pure noise. |
+| `blog_scroll` | people who **read an article** | Engagement, not intent to book. |
+| ✅ `booking_confirmed` | people who **actually book** | The real outcome — and it carries `value`, so Ads can chase higher-value bookings (tROAS). |
 
-**Why not the micro-conversions** (all valuable in GA4 for analysis/remarketing, but wrong as the bid target):
+We send it from **GA4 into Google Ads** (not a separate Ads tag) so there's one agreed definition of
+"a booking," no double-counting, and value-based bidding is available.
 
-| Event | Why it's excluded as the Ads conversion |
-|-------|-----------------------------------------|
-| `call_now_click` / `whatsapp_click` | A tap is **intent, not outcome** — no proof the call/chat connected or booked. Bidding would optimise for cheap tappers. |
-| `patient_guide_download` | Downloading a free PDF is **top-of-funnel curiosity** — far cheaper and more frequent than a booking; it would flood the account with guide-grabbers. |
-| `clinic_location_view` | A **passive visibility** event — near-pure noise as a conversion. |
-| `blog_scroll_25/50/75/90` | **Engagement micro-signals**, extremely high-volume and weakly correlated with booking; they'd drown the real conversion. |
+---
 
-> **Principle:** optimise bidding toward the outcome that makes money (`booking_confirmed`); use everything else as analysis and remarketing signals — never as the bid target. Importing `booking_confirmed` from GA4 (rather than a direct Ads tag) also gives one deduplicated source of truth, server-side reliability, and value-based bidding.
+## Design choices worth knowing (so you can defend them)
+
+- **Blog scroll is one event (`blog_scroll`) with a `percent_scrolled` parameter**, not four separate `blog_scroll_25/50/75/90` events. It's cleaner to explain and matches how GA4 natively handles scroll. (The original brief listed the four thresholds separately — this is the same information, modelled better.)
+- **`clinic_location_view` becomes `clinic_page_view` on the real site.** OrthoNow has nine real clinic pages, so in production this is a normal page view on `/clinics/*`. On our single-page demo we approximate it with an Element-Visibility trigger — same event, different plumbing.
+- **`phone_provided` is a boolean, never the number.** We record *that* someone gave a phone, not the phone itself — a useful signal without putting personal data in analytics.
+- **No PII in GA4, ever.** Names and phone numbers go to the CRM (see Task 3). GA4 only gets non-personal context like clinic, specialty and value.
+
+---
+
+## Mini-glossary (hand this to anyone who's lost)
+
+| Term | What it means |
+|------|---------------|
+| **dataLayer** | A small list on the page where the developer writes structured notes about what's happening. |
+| **event** | One note — the name of a thing that happened (`booking_confirmed`). |
+| **parameter** | A detail attached to the note (`clinic_location: "Indiranagar"`). |
+| **GTM (Tag Manager)** | The tool that watches the notes and forwards them — configured without code changes. |
+| **trigger** | The rule in GTM that says "when *this* note appears, do something." |
+| **GA4** | Google Analytics — stores the notes and turns them into reports and audiences. |
+| **audience** | A saved group of people (e.g. "started booking but didn't finish") we can re-target with ads. |
+| **conversion** | The action that counts as success. Here: `booking_confirmed`. |
+
+All ten events are implemented and observable in the [Task 2 landing page](../task-02-landing-page/index.html) —
+open the browser console and interact with the page to watch the notes appear.

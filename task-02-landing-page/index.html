@@ -882,7 +882,8 @@
           }
           track("booking_step_complete", {
             step_number: 2, step_name: "contact_and_date_entered",
-            clinic_location: B.clinic.value, specialty: B.specialty.value, appointment_date: B.date.value
+            clinic_location: B.clinic.value, specialty: B.specialty.value,
+            appointment_date: B.date.value, phone_provided: true
           });
           buildReview();
           showStep(3);
@@ -1029,7 +1030,8 @@
       if (!ok) { (G.name.getAttribute("aria-invalid") ? G.name : G.phone).focus(); return; }
 
       // Lead capture event (developer-owned).
-      track("patient_guide_submit", { guide_name: "Knee Pain Recovery Guide", pain_area: "knee", city: "" });
+      // phone_provided is a boolean signal — we record THAT a number was given, never the number itself.
+      track("patient_guide_submit", { guide_name: "Knee Pain Recovery Guide", pain_area: "knee", phone_provided: true });
 
       // Generate + download the PDF.
       var pdf = buildGuidePdf();
@@ -1071,7 +1073,9 @@
         [25, 50, 75, 90].forEach(function (t) {
           if (!fired[t] && pct >= t) {
             fired[t] = true;
-            track("blog_scroll_" + t, {
+            // One event with a percent_scrolled parameter (25/50/75/90) —
+            // cleaner than four separate event names. See Task 1 schema.
+            track("blog_scroll", {
               percent_scrolled: t,
               article_title: article.getAttribute("data-title"),
               pain_area: article.getAttribute("data-pain"),
