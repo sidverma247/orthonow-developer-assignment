@@ -17,6 +17,7 @@
 
 > **🔗 Live demo:** https://sidverma247.github.io/orthonow-developer-assignment/ &nbsp;·&nbsp;
 > **Repo:** https://github.com/sidverma247/orthonow-developer-assignment
+> > **Loom Video:** https://www.loom.com/share/e23fcd286eb14a2c9f1815eccb343ccf
 
 ## Project overview
 
