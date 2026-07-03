@@ -9,47 +9,80 @@
 
 ### Decision first: a direct API call to our own backend
 
-Of the options, I'd build a **custom backend that the landing page calls directly (HTTPS POST), which
+For OrthoNow I'd build a **custom backend that our booking page calls directly (HTTPS POST), which
 then talks to HubSpot, the queue and Karix via their REST APIs** — not the HubSpot native embed, not
-the Forms API, not Zapier/Make. The reason in one line: **every hard requirement in this brief —
-deduplicate by phone, a 2-minute WhatsApp SLA, idempotency, no lost leads — is orchestration logic
-that only a backend I control can express.** A connector hides exactly the machinery I need to own.
+the Forms API, not Zapier/Make. The reason in one line, grounded in *this* project: **our audience is
+28–50 working professionals who book a ₹800 orthopaedic consultation by phone (many never give an
+email), against a 2-minute WhatsApp SLA — so dedup-by-phone, idempotency and no-lost-leads are the
+whole job, and that is orchestration logic only a backend I control can express.** A connector hides
+exactly the machinery this project lives or dies on.
 
 ### The end-to-end flow, in order, with the actual tech at each step
 
+Everything runs in **AWS `ap-south-1` (Mumbai)** — lowest latency to the Bengaluru / Hyderabad /
+Chennai audience and keeps health-related personal data in-region (relevant under India's **DPDP Act**).
+
 ```
-Browser  (OrthoNow booking page, vanilla JS — Task 2)
+Browser  (OrthoNow booking page, vanilla JS — our Task 2 index.html)
+   │  form: name · 10-digit mobile · clinic (9 across 3 cities) · specialty · preferred date
    │
-   ├─(a) dataLayer.push ─► GTM ─► GA4 ─► Google Ads (conversion import)      [measurement path]
+   ├─(a) dataLayer.push: consultation_form_submitted + booking_confirmed
+   │        ─► GTM ─► GA4 ─► Google Ads (import booking_confirmed)           [measurement path]
    │
-   └─(b) HTTPS POST /api/leads (JSON)                                        [fulfilment path]
+   └─(b) HTTPS POST /api/leads  (the same validated payload)                 [fulfilment path]
         ▼
-   AWS API Gateway   (TLS, throttling, WAF)
+   AWS API Gateway   (TLS, throttling, AWS WAF)
         ▼
-   Backend orchestrator — AWS Lambda (Node/TypeScript)   [or ECS Fargate + Express]
-        │  1. validate + normalise phone to E.164
-        │  2. write raw lead to DynamoDB FIRST (write-ahead → nothing is ever lost)
-        │  3. assign idempotency key (booking_id)
+   Backend orchestrator — AWS Lambda (Node/TypeScript), region ap-south-1
+        │  1. re-validate; normalise "9812345678" → E.164 "+919812345678"  (the dedup key)
+        │  2. write raw lead to DynamoDB FIRST, PK = booking_id  (write-ahead → never lost)
+        │  3. booking_id "ORTHO-2026-000482" is the idempotency key end-to-end
         ▼
    HubSpot CRM API v3
-        │  4. POST /crm/v3/objects/contacts/search   → filter by phone
-        │  5. found? PATCH (update) : POST (create)
+        │  4. POST /crm/v3/objects/contacts/search  → filter on phone = "+919812345678"
+        │  5. found? PATCH (update) : POST (create)   [dedup-by-phone — see Q2 / edge-case matrix]
         ▼
-   Amazon SQS  (+ Dead Letter Queue)   ── publish "SendWhatsApp", then return 200 to the browser
+   Amazon SQS  (+ Dead Letter Queue)  ── publish "SendWhatsApp", then return 200 to the browser
         ▼
    SQS consumer  (AWS Lambda)
         ▼
-   Karix WhatsApp Business REST API   — send confirmation template   (must complete ≤ 2 min)
-        ▼
-   CloudWatch + Grafana   — metrics, p95 send latency, queue age, alarms
+   Karix WhatsApp Business REST API  — send an approved confirmation template
+        │  "Hi Ananya, your OrthoNow consultation at Indiranagar on 9 Jul is being confirmed…"
+        ▼   (must complete ≤ 2 min)
+   CloudWatch + Grafana  — metrics, p95 send latency, queue age, DLQ depth, alarms
 ```
 
-### Why that order matters
+**Concrete payload our page sends to `/api/leads`** (derived directly from the Task 2 form + the
+`booking_confirmed` dataLayer event):
 
-1. **Measurement and fulfilment split at the browser** — a slow CRM never delays the analytics event, and an ad-blocker on GTM never loses the lead.
-2. **Persist the raw lead before calling anyone.** The DynamoDB write-ahead step means that even if HubSpot *and* Karix are both down, the lead still exists and can be replayed. This is the single most important reliability decision.
-3. **HubSpot upsert is synchronous** (it's fast; the browser can wait ~300 ms), but **the WhatsApp send is queued** — Karix latency, rate limits or an outage must not block the user's request or start eating the SLA clock. The API returns `200` the instant the message is enqueued.
-4. **DLQ + idempotency (`booking_id`)** make every downstream step safely retryable — no duplicate contacts, no double WhatsApp sends.
+```json
+{
+  "booking_id": "ORTHO-2026-000482",
+  "name": "Ananya Rao",
+  "phone": "9812345678",
+  "clinic_location": "Bengaluru — Indiranagar",
+  "specialty": "Knee pain",
+  "appointment_date": "2026-07-09",
+  "value": 800,
+  "currency": "INR",
+  "source": "consultation_landing_page"
+}
+```
+
+### Why that order matters (for OrthoNow specifically)
+
+1. **Measurement and fulfilment split at the browser** — a slow HubSpot call never delays the GA4 `booking_confirmed` event, and an ad-blocker on GTM never loses the actual lead, because the lead goes to our own `/api/leads`, not to a third-party tag.
+2. **Persist the raw lead before calling anyone.** DynamoDB write-ahead (keyed on `booking_id`) means even if HubSpot *and* Karix are both down, the booking still exists and is replayable — non-negotiable when the "lead" is a patient expecting a call back.
+3. **HubSpot upsert is synchronous** (fast; the browser waits ~300 ms), but **the Karix WhatsApp send is queued** — a Karix spike, +91 template rate-limit or outage must not block the request or start eating the 2-minute SLA. The API returns `200` the instant the message is enqueued.
+4. **`booking_id` is one idempotency key across the whole chain** — DynamoDB PK, HubSpot search fallback, SQS dedup and the Karix send — so a retry or a double-tap on "Confirm" can't create a duplicate contact or a second WhatsApp.
+
+### Why Karix (and not a generic global provider)
+
+Karix is an India-based CPaaS with a mature WhatsApp Business API and strong local deliverability for
+`+91` numbers — the right fit for an all-India (Bengaluru/Hyderabad/Chennai) patient base where
+template approval, sender registration and latency are all India-specific. The architecture treats it
+as a swappable REST integration behind the queue, so a provider change never touches the rest of the
+pipeline.
 
 ### The connector justification — why not the alternatives
 
@@ -62,14 +95,39 @@ Browser  (OrthoNow booking page, vanilla JS — Task 2)
 
 ### Named stack, at a glance
 
-- **Frontend:** the Task 2 vanilla-JS page → `POST /api/leads`.
-- **Edge / API:** AWS API Gateway → AWS Lambda (Node/TypeScript). (ECS Fargate + Express if a long-running service is preferred.)
-- **Durable store:** DynamoDB (write-ahead lead log) — or RDS Postgres.
-- **CRM:** HubSpot CRM API v3 (Search + Create/Update contacts) via a private-app token.
+- **Frontend:** our Task 2 vanilla-JS booking page → `POST /api/leads` (name · +91 mobile · clinic · specialty · date).
+- **Edge / API:** AWS API Gateway + WAF → AWS Lambda (Node/TypeScript), region **ap-south-1 (Mumbai)**.
+- **Durable store:** DynamoDB (write-ahead lead log), partition key `booking_id`.
+- **CRM:** HubSpot CRM API v3 (Search + Create/Update contacts) via a private-app token; searched on the **phone** property in E.164.
 - **Queue:** Amazon SQS + dedicated Dead Letter Queue; idempotency keyed on `booking_id`.
-- **WhatsApp:** Karix WhatsApp Business REST API (template message).
-- **Analytics / Ads:** GTM → GA4 → Google Ads conversion import (optionally GA4 Measurement Protocol server-side for reliability).
-- **Ops:** CloudWatch alarms + Grafana dashboards; structured logs with correlation IDs; AWS Secrets Manager for the HubSpot token and Karix key.
+- **WhatsApp:** Karix WhatsApp Business REST API (approved confirmation template).
+- **Analytics / Ads:** GTM → GA4 → Google Ads import of `booking_confirmed` (optionally GA4 Measurement Protocol server-side for reliability).
+- **Ops / security:** CloudWatch alarms + Grafana dashboards; structured logs with correlation IDs; AWS Secrets Manager for the HubSpot token and Karix key; in-region data residency for DPDP.
+
+### Analysis — why this design fits OrthoNow (trade-offs and risks)
+
+**Why it fits.** Every choice tracks a specific fact about this campaign. The audience is *phone-first
+and email-optional*, so **dedup must key on phone**, which HubSpot won't do natively — that single
+fact is what rules out the embed and the Forms API. A booked consultation is *worth ₹800 and a
+patient's trust*, so **losing a lead is unacceptable** — hence the DynamoDB write-ahead and the DLQ.
+The confirmation is *promised within 2 minutes over WhatsApp to +91 numbers*, so **the send is queued
+and monitored** and the provider (Karix) is India-appropriate. The data is *health-related personal
+data of Indian residents*, so **ap-south-1 residency and secrets management** matter under the DPDP
+Act.
+
+**The honest trade-off.** A custom backend is more to build and run than a Zapier zap or a HubSpot
+embed — we own a Lambda, a queue, a table and their monitoring. That cost is justified here because
+the requirements (phone-dedup, SLA, zero lead loss) are *exactly* the things no-code tools do poorly;
+for a lower-stakes newsletter signup I'd happily use the embed. Scale is not the driver — a few
+hundred leads a day is trivial for this stack — **reliability and control are**.
+
+**Residual risks and how the design absorbs them.** HubSpot outage → retries then DLQ + replay (lead
+already safe in DynamoDB). Karix outage or template rate-limit → queued, retried with backoff, alarmed
+on queue age before the SLA is breached. Shared/ambiguous phone numbers → never overwrite; create +
+associate + `needs_review` for ops (see the edge-case matrix). Duplicate submits / refreshes →
+`booking_id` idempotency makes them no-ops. The one thing outside our control — a *user* mistyping
+their own number — is mitigated by the page's `^[6-9]\d{9}$` validation and the WhatsApp confirmation
+itself acting as a delivery check.
 
 ---
 
