@@ -15,6 +15,9 @@
 
 ---
 
+> **🔗 Live demo:** https://sidverma247.github.io/orthonow-developer-assignment/ &nbsp;·&nbsp;
+> **Repo:** https://github.com/sidverma247/orthonow-developer-assignment
+
 ## Project overview
 
 **OrthoNow** is a (fictional, for-assignment) multi-city orthopaedic clinic group running a
@@ -103,7 +106,7 @@ The landing page is a single static file — no build step, no server required.
 
 ```bash
 # 1. Clone
-git clone https://github.com/<your-username>/orthonow-developer-assignment.git
+git clone https://github.com/sidverma247/orthonow-developer-assignment.git
 cd orthonow-developer-assignment
 
 # 2a. Simplest: open the file directly
@@ -157,7 +160,8 @@ See [`docs/assignment-overview.md`](docs/assignment-overview.md) for the brief r
 A ≤8-minute video walking through the repo, a live demo of the form + `dataLayer`, and the
 integration design.
 
-**▶ Loom link:** _add your recorded Loom URL here_
+**▶ Loom link:** _paste your recorded Loom URL here_
+**▶ Live page to demo in the video:** https://sidverma247.github.io/orthonow-developer-assignment/
 
 The full minute-by-minute script (and likely interviewer questions with answers) lives in
 [`docs/loom-script.md`](docs/loom-script.md).
@@ -190,6 +194,7 @@ Quick version — full guide in [`docs/testing-guide.md`](docs/testing-guide.md)
 ## Author
 
 **Priyanshi** — Frontend / Analytics developer
+GitHub: [@sidverma247](https://github.com/sidverma247)
 Built for the OrthoNow / Namoza developer assignment.
 
 ---
