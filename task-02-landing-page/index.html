@@ -188,6 +188,27 @@
 
     /* Clinic locations */
     .clinic-grid { display: grid; gap: var(--s-3); }
+
+    /* Collapsible city groups (native <details>). Open on desktop; on mobile
+       JS opens only the first city so the section stays compact. */
+    .city-group {
+      border: 1px solid var(--line); border-radius: var(--radius); background: #fff;
+      box-shadow: var(--shadow); margin-bottom: var(--s-3); overflow: hidden;
+    }
+    .city-group > summary {
+      list-style: none; cursor: pointer; display: flex; align-items: center; gap: var(--s-2);
+      padding: var(--s-3); font-weight: 700; color: var(--navy); user-select: none;
+    }
+    .city-group > summary::-webkit-details-marker { display: none; }
+    .city-group > summary .city-name { font-size: 18px; }
+    .city-group > summary .city-count { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--muted); }
+    .city-group > summary::after { content: "+"; font-size: 22px; color: var(--muted); width: 18px; text-align: center; }
+    .city-group[open] > summary::after { content: "\2013"; }
+    .city-group .clinic-grid { padding: 0 var(--s-3) var(--s-3); }
+    /* Inner cards sit inside the group container, so drop their own shadow. */
+    .city-group .clinic-card { box-shadow: none; }
+    .city-group .clinic-card:hover { box-shadow: var(--shadow); }
+
     .clinic-card { display: flex; flex-direction: column; }
     .clinic-card .city-tag { font-size: 12px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .04em; }
     .clinic-card h3 { margin: 4px 0 6px; font-size: 18px; }
@@ -399,10 +420,10 @@
       <div class="wrap">
         <div class="section-head">
           <h2 id="clinics-title">Find your nearest OrthoNow clinic</h2>
-          <p>Nine clinics across Bengaluru, Hyderabad and Chennai. Tap a clinic to see hours and directions.</p>
+          <p>Nine clinics across Bengaluru, Hyderabad and Chennai. Tap a city to see its clinics.</p>
         </div>
-        <div class="clinic-grid" id="clinic-grid" role="list">
-          <!-- Cards are rendered by JS from a single source of truth (keeps markup DRY). -->
+        <div id="clinic-groups">
+          <!-- City groups + cards are rendered by JS from a single source of truth (keeps markup DRY). -->
         </div>
       </div>
     </section>
@@ -690,58 +711,82 @@
 
     /* Render clinic cards + populate the booking dropdown from the same data. */
     (function renderClinics() {
-      var grid = document.getElementById("clinic-grid");
+      var container = document.getElementById("clinic-groups");
       var select = document.getElementById("b-clinic");
+
+      // Group clinics by city, preserving first-seen order.
+      var cities = [];
       var byCity = {};
-      var frag = document.createDocumentFragment();
-
-      CLINICS.forEach(function (c, i) {
-        var label = c.city + " — " + c.name;
-
-        // Card
-        var card = document.createElement("article");
-        card.className = "card clinic-card";
-        card.setAttribute("role", "listitem");
-        card.innerHTML =
-          '<span class="city-tag">' + c.city + '</span>' +
-          '<h3>' + c.name + '</h3>' +
-          '<p class="addr">' + c.addr + '</p>' +
-          '<div class="clinic-actions">' +
-            '<button type="button" class="btn btn-ghost btn-sm" data-view-clinic>View clinic</button>' +
-            '<a class="btn btn-primary btn-sm" href="tel:+918040001234" data-call data-loc="clinic_card">📞 Call</a>' +
-          '</div>' +
-          '<div class="clinic-details" id="clinic-det-' + i + '">' +
-            '<strong>Hours:</strong> ' + c.hours + '<br>' +
-            '<strong>Address:</strong> ' + c.addr + ', ' + c.city + '.' +
-          '</div>';
-
-        // Wire "View clinic" → expand + clinic_location_view
-        var viewBtn = card.querySelector("[data-view-clinic]");
-        var details = card.querySelector(".clinic-details");
-        viewBtn.addEventListener("click", function () {
-          var open = details.classList.toggle("show");
-          viewBtn.textContent = open ? "Hide details" : "View clinic";
-          if (open) {
-            track("clinic_location_view", { clinic_location: c.name, city: c.city, page_location: location.href });
-          }
-        });
-
-        frag.appendChild(card);
-
-        // Group options for the <select> by city
-        (byCity[c.city] = byCity[c.city] || []).push(label);
+      CLINICS.forEach(function (c) {
+        if (!byCity[c.city]) { byCity[c.city] = []; cities.push(c.city); }
+        byCity[c.city].push(c);
       });
-      grid.appendChild(frag);
 
-      Object.keys(byCity).forEach(function (city) {
-        var group = document.createElement("optgroup");
-        group.label = city;
-        byCity[city].forEach(function (label) {
-          var opt = document.createElement("option");
-          opt.value = label; opt.textContent = label.split("—")[1].trim();
-          group.appendChild(opt);
+      // On mobile we open only the first city so the section stays compact.
+      var mobile = window.innerWidth < 768;
+
+      cities.forEach(function (city, ci) {
+        // A collapsible <details> per city.
+        var group = document.createElement("details");
+        group.className = "city-group";
+        if (!mobile || ci === 0) group.setAttribute("open", "");
+
+        var summary = document.createElement("summary");
+        summary.innerHTML =
+          '<span class="city-name">' + city + '</span>' +
+          '<span class="city-count">' + byCity[city].length + ' clinics</span>';
+        group.appendChild(summary);
+
+        var gridEl = document.createElement("div");
+        gridEl.className = "clinic-grid";
+        gridEl.setAttribute("role", "list");
+
+        byCity[city].forEach(function (c) {
+          var idSafe = (city + "-" + c.name).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+          var card = document.createElement("article");
+          card.className = "card clinic-card";
+          card.setAttribute("role", "listitem");
+          card.innerHTML =
+            '<h3>' + c.name + '</h3>' +
+            '<p class="addr">' + c.addr + '</p>' +
+            '<div class="clinic-actions">' +
+              '<button type="button" class="btn btn-ghost btn-sm" data-view-clinic>View clinic</button>' +
+              '<a class="btn btn-primary btn-sm" href="tel:+918040001234" data-call data-loc="clinic_card">📞 Call</a>' +
+            '</div>' +
+            '<div class="clinic-details" id="clinic-det-' + idSafe + '">' +
+              '<strong>Hours:</strong> ' + c.hours + '<br>' +
+              '<strong>Address:</strong> ' + c.addr + ', ' + c.city + '.' +
+            '</div>';
+
+          // "View clinic" reveals hours + fires clinic_location_view (per clinic).
+          var viewBtn = card.querySelector("[data-view-clinic]");
+          var details = card.querySelector(".clinic-details");
+          viewBtn.addEventListener("click", function () {
+            var open = details.classList.toggle("show");
+            viewBtn.textContent = open ? "Hide details" : "View clinic";
+            if (open) {
+              track("clinic_location_view", { clinic_location: c.name, city: c.city, page_location: location.href });
+            }
+          });
+
+          gridEl.appendChild(card);
         });
-        select.appendChild(group);
+
+        group.appendChild(gridEl);
+        container.appendChild(group);
+      });
+
+      // Populate the booking dropdown, grouped by city (same source of truth).
+      cities.forEach(function (city) {
+        var optgroup = document.createElement("optgroup");
+        optgroup.label = city;
+        byCity[city].forEach(function (c) {
+          var opt = document.createElement("option");
+          opt.value = city + " — " + c.name;
+          opt.textContent = c.name;
+          optgroup.appendChild(opt);
+        });
+        select.appendChild(optgroup);
       });
     })();
 
