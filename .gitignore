@@ -1,6 +1,8 @@
 # OS / editor cruft
 .DS_Store
 Thumbs.db
+.Rapp.history
+.Rhistory
 *.swp
 *~
 .idea/

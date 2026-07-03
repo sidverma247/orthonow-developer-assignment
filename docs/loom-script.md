@@ -62,7 +62,7 @@ don't tell. Have the repo open in an editor and `index.html` open in a browser w
 
 ## 5:30–7:00 — Task 3: integration design
 
-- Open `Integration_Architecture.md`, show the ASCII flow.
+- Open `README_Task_03_Integration_Design.md`, show the ASCII flow.
 > "Browser to a custom backend, not Zapier — because I need dedup, retries, an SLA and idempotency,
 > and connectors hide all of that. The key trap: HubSpot deduplicates by email, but our patients book
 > by phone. So I search HubSpot by the phone property first, then update or create."

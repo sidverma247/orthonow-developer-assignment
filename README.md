@@ -63,7 +63,7 @@ orthonow-developer-assignment/
 │
 ├── task-03-integration-design/       ← TASK 3: server-side architecture
 │   ├── README.md
-│   ├── Integration_Architecture.md   ← ~350-word design doc
+│   ├── README_Task_03_Integration_Design.md  ← the integration design write-up
 │   └── architecture-diagram.png      ← the data-flow diagram
 │
 ├── assets/

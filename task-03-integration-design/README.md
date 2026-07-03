@@ -3,8 +3,8 @@
 Server-side architecture for turning a submitted lead into a HubSpot contact, a WhatsApp confirmation
 (within a 2-minute SLA) and a Google Ads conversion — without duplicates or lost leads.
 
-- **[Integration_Architecture.md](Integration_Architecture.md)** — the ~350-word design doc plus the
-  edge-case matrix, idempotency/DLQ notes, and the GA4-vs-direct-Ads-tag rationale.
+- **[README_Task_03_Integration_Design.md](README_Task_03_Integration_Design.md)** — the integration
+  design write-up: end-to-end architecture, the dedup trap, failure/fallback and the WhatsApp SLA.
 
 ## The core decisions, at a glance
 
