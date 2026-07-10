@@ -200,6 +200,3 @@ Built for the OrthoNow / Namoza developer assignment.
 
 ---
 
-## License
-
-Released under the [MIT License](LICENSE).
