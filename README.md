@@ -47,14 +47,7 @@ and watch `window.dataLayer` populate in the console.
 orthonow-developer-assignment/
 │
 ├── README.md                         ← you are here
-├── LICENSE                           ← MIT
 ├── .gitignore
-│
-├── docs/                             ← cross-cutting project docs
-│   ├── assignment-overview.md        ← the brief, restated + how each task maps to it
-│   ├── pagespeed-notes.md            ← Lighthouse strategy & expected scores
-│   ├── loom-script.md                ← minute-by-minute walkthrough script (≤8 min)
-│   └── testing-guide.md              ← how to test the page, validation, GTM & Lighthouse
 │
 ├── task-01-gtm-schema/               ← TASK 1: measurement plan
 │   └── GTM_Event_Schema.md           ← full event table (13 events) + 3-step funnel
@@ -66,16 +59,7 @@ orthonow-developer-assignment/
 │   └── assets/                       ← desktop/mobile/pagespeed screenshots
 │
 ├── task-03-integration-design/       ← TASK 3: server-side architecture
-│   ├── README.md
 │   ├── README_Task_03_Integration_Design.md  ← the integration design write-up
-│   └── architecture-diagram.png      ← the data-flow diagram
-│
-├── assets/
-│   └── screenshots/                  ← shared screenshots referenced by the README
-│
-└── .github/
-    └── workflows/
-        └── lint.yml                  ← HTML validation on push (CI)
 ```
 
 **Why this layout?** Each task is a self-contained folder with its own `README`, so a reviewer can
