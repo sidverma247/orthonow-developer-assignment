@@ -146,15 +146,6 @@ See [`docs/assignment-overview.md`](docs/assignment-overview.md) for the brief r
 
 ---
 
-## Screenshots
-
-> Place exported images in the paths below and they will render here.
-
-| Desktop | Mobile | Lighthouse (mobile) |
-|---------|--------|---------------------|
-| ![Desktop preview](task-02-landing-page/assets/desktop-preview.png) | ![Mobile preview](task-02-landing-page/assets/mobile-preview.png) | ![PageSpeed mobile](task-02-landing-page/assets/pagespeed-mobile.png) |
-
----
 
 ## Loom walkthrough
 
@@ -182,15 +173,7 @@ Quick version — full guide in [`docs/testing-guide.md`](docs/testing-guide.md)
 
 ---
 
-## Future improvements
 
-- Wire the front-end `dataLayer` push to a real GTM container ID and publish the GA4 + Ads tags.
-- Add the multi-step booking flow (Task 1 documents its events) as a progressive-enhancement layer.
-- Server endpoint implementing the Task 3 architecture (HubSpot search-by-phone → upsert → queue → Karix).
-- Add automated a11y tests (axe-core) and a Lighthouse-CI budget to the GitHub Action.
-- Consent-mode v2 gating so tags respect the visitor's cookie choice.
-
----
 
 ## Author
 
